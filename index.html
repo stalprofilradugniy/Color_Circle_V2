@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bubble Clicker</title>
     <style>
         * {
@@ -16,6 +16,7 @@
             background: #f0f0f0;
             font-family: Arial, sans-serif;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #gameContainer {
@@ -49,6 +50,7 @@
                 rgba(255,255,255,0.6) 20%, 
                 rgba(0,0,0,0) 70%);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            touch-action: none;
         }
 
         .bubble:active {
@@ -76,10 +78,22 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+        }
+
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 1.5em;
+            z-index: 4;
         }
     </style>
 </head>
 <body>
+    <button id="startButton">Start Game</button>
     <div id="gameContainer">
         <div id="topPanel">
             <div>Time: <span id="timer">10</span>s</div>
@@ -100,6 +114,7 @@
         const gameContainer = document.getElementById('gameContainer');
         const clickSound = document.getElementById('clickSound');
         const backgroundMusic = document.getElementById('backgroundMusic');
+        const startButton = document.getElementById('startButton');
         let score = 0;
         let startTime;
         let reactionTimes = [];
@@ -113,19 +128,24 @@
             const bubble = document.createElement('div');
             bubble.className = 'bubble';
             
-            const safeArea = {
-                x: gameContainer.clientWidth - size,
-                y: gameContainer.clientHeight - size - topPanelHeight
-            };
+            const containerWidth = gameContainer.offsetWidth;
+            const containerHeight = gameContainer.offsetHeight;
+            const maxX = containerWidth - size;
+            const maxY = containerHeight - size - topPanelHeight;
 
             bubble.style.width = `${size}px`;
             bubble.style.height = `${size}px`;
-            bubble.style.left = `${Math.random() * safeArea.x}px`;
-            bubble.style.top = `${Math.random() * safeArea.y + topPanelHeight}px`;
+            bubble.style.left = `${Math.random() * maxX}px`;
+            bubble.style.top = `${topPanelHeight + Math.random() * maxY}px`;
             bubble.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
 
-            bubble.addEventListener('click', handleBubbleClick);
-            bubble.addEventListener('touchstart', handleBubbleClick);
+            bubble.ontouchstart = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleBubbleClick(e);
+            }
+            bubble.onclick = handleBubbleClick;
+            
             gameContainer.appendChild(bubble);
         }
 
@@ -141,25 +161,29 @@
             updateAverageReaction();
             
             clickSound.currentTime = 0;
-            clickSound.play();
+            clickSound.play().catch(() => {});
             
             if (navigator.vibrate) navigator.vibrate(50);
             startTime = Date.now();
         }
 
         function updateAverageReaction() {
-            const avg = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+            const avg = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length || 0;
             document.getElementById('avgReaction').textContent = avg.toFixed(0);
         }
 
         function startGame() {
+            startButton.style.display = 'none';
             gameActive = true;
             score = 0;
             reactionTimes = [];
             document.getElementById('score').textContent = '0';
             document.getElementById('avgReaction').textContent = '0';
-            backgroundMusic.play();
             
+            backgroundMusic.play().catch(() => {
+                console.log('Audio playback blocked by browser policy');
+            });
+
             let timeLeft = 10;
             const timer = setInterval(() => {
                 timeLeft--;
@@ -184,8 +208,7 @@
             backgroundMusic.pause();
             backgroundMusic.currentTime = 0;
             
-            const bubbles = document.querySelectorAll('.bubble');
-            bubbles.forEach(bubble => bubble.remove());
+            document.querySelectorAll('.bubble').forEach(bubble => bubble.remove());
             
             const gameOverDiv = document.createElement('div');
             gameOverDiv.id = 'gameOver';
@@ -197,15 +220,16 @@
             document.body.appendChild(gameOverDiv);
         }
 
-        // Touch event handlers
-        gameContainer.addEventListener('touchstart', (e) => {
+        // Обработчики старта игры
+        startButton.addEventListener('click', startGame);
+        startButton.addEventListener('touchstart', function(e) {
             e.preventDefault();
+            startGame();
         }, { passive: false });
 
-        // Start game on first click
-        document.body.addEventListener('click', function firstClick() {
-            startGame();
-            document.body.removeEventListener('click', firstClick);
+        // Предотвращение масштабирования
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
         });
     </script>
 </body>
