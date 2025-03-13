@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bubble Clicker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        body {
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #topPanel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 2;
+        }
+
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: radial-gradient(circle at 30% 30%, 
+                rgba(255,255,255,0.8) 0%, 
+                rgba(255,255,255,0.6) 20%, 
+                rgba(0,0,0,0) 70%);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .bubble:active {
+            transform: scale(0.9);
+        }
+
+        #gameOver {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            z-index: 3;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="topPanel">
+            <div>Time: <span id="timer">10</span>s</div>
+            <div>Score: <span id="score">0</span></div>
+            <div>Avg: <span id="avgReaction">0</span>ms</div>
+        </div>
+    </div>
+
+    <audio id="clickSound">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2695/2695-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <audio id="backgroundMusic" loop>
+        <source src="https://assets.mixkit.co/music/preview/mixkit-happy-times-158.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const gameContainer = document.getElementById('gameContainer');
+        const clickSound = document.getElementById('clickSound');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        let score = 0;
+        let startTime;
+        let reactionTimes = [];
+        let gameActive = false;
+        const topPanelHeight = 80;
+
+        function createBubble() {
+            if (!gameActive) return;
+
+            const size = Math.random() * 60 + 40;
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            
+            const safeArea = {
+                x: gameContainer.clientWidth - size,
+                y: gameContainer.clientHeight - size - topPanelHeight
+            };
+
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
+            bubble.style.left = `${Math.random() * safeArea.x}px`;
+            bubble.style.top = `${Math.random() * safeArea.y + topPanelHeight}px`;
+            bubble.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
+
+            bubble.addEventListener('click', handleBubbleClick);
+            bubble.addEventListener('touchstart', handleBubbleClick);
+            gameContainer.appendChild(bubble);
+        }
+
+        function handleBubbleClick(e) {
+            if (!gameActive) return;
+            
+            e.target.remove();
+            score++;
+            document.getElementById('score').textContent = score;
+            
+            const reactionTime = Date.now() - startTime;
+            reactionTimes.push(reactionTime);
+            updateAverageReaction();
+            
+            clickSound.currentTime = 0;
+            clickSound.play();
+            
+            if (navigator.vibrate) navigator.vibrate(50);
+            startTime = Date.now();
+        }
+
+        function updateAverageReaction() {
+            const avg = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+            document.getElementById('avgReaction').textContent = avg.toFixed(0);
+        }
+
+        function startGame() {
+            gameActive = true;
+            score = 0;
+            reactionTimes = [];
+            document.getElementById('score').textContent = '0';
+            document.getElementById('avgReaction').textContent = '0';
+            backgroundMusic.play();
+            
+            let timeLeft = 10;
+            const timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    endGame();
+                }
+            }, 1000);
+
+            const bubbleInterval = setInterval(() => {
+                createBubble();
+                if (!gameActive) clearInterval(bubbleInterval);
+            }, 500);
+
+            startTime = Date.now();
+        }
+
+        function endGame() {
+            gameActive = false;
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0;
+            
+            const bubbles = document.querySelectorAll('.bubble');
+            bubbles.forEach(bubble => bubble.remove());
+            
+            const gameOverDiv = document.createElement('div');
+            gameOverDiv.id = 'gameOver';
+            gameOverDiv.innerHTML = `
+                <h2>Game Over!</h2>
+                <p>Final Score: ${score}</p>
+                <button onclick="startGame()">Play Again</button>
+            `;
+            document.body.appendChild(gameOverDiv);
+        }
+
+        // Touch event handlers
+        gameContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Start game on first click
+        document.body.addEventListener('click', function firstClick() {
+            startGame();
+            document.body.removeEventListener('click', firstClick);
+        });
+    </script>
+</body>
+</html>
